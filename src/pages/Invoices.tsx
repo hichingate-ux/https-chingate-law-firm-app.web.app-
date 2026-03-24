@@ -16,16 +16,15 @@ const Invoices = () => {
     number: '', concept: '', value: 0, emissionDate: '', dueDate: '', status: 'Pendiente', clientId: '', notes: '', responsible: user?.name || ''
   });
 
-  const loadData = async () => {
-    const invs = await invoicesDAO.getAll(user);
-    const cls = await clientsDAO.getAll(user);
-    setInvoices(invs);
-    setClients(cls);
-  };
-
   useEffect(() => {
-    loadData();
-  }, [user]);
+    const unsubscribeInvoices = invoicesDAO.subscribe(setInvoices);
+    const unsubscribeClients = clientsDAO.subscribe(setClients);
+
+    return () => {
+      unsubscribeInvoices();
+      unsubscribeClients();
+    };
+  }, []);
 
   const handleOpenModal = async (inv?: any) => {
     if (inv) {
@@ -52,7 +51,6 @@ const Invoices = () => {
   const handleDelete = async (id: string) => {
     if (confirm('¿Eliminar esta factura permanentemente?')) {
       await invoicesDAO.delete(id);
-      loadData();
     }
   };
 
@@ -64,7 +62,6 @@ const Invoices = () => {
       await invoicesDAO.create({ ...formData, value: Number(formData.value) }, user);
     }
     setIsModalOpen(false);
-    loadData();
   };
 
   const getClientName = (id: string) => clients.find(c => c.id === id)?.name || 'Cliente no encontrado';

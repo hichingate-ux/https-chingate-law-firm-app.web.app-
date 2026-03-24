@@ -13,15 +13,14 @@ const Agenda = () => {
     title: '', date: '', time: '', responsible: '', status: 'Pendiente', matterId: ''
   });
 
-  const loadData = async () => {
-    const evs = await eventsDAO.getAll(user);
-    const mats = await mattersDAO.getAll(user);
-    setEvents(evs);
-    setMatters(mats);
-  };
-
   useEffect(() => {
-    loadData();
+    const unsubscribeEvents = eventsDAO.subscribe(setEvents);
+    const unsubscribeMatters = mattersDAO.subscribe(setMatters);
+
+    return () => {
+      unsubscribeEvents();
+      unsubscribeMatters();
+    };
   }, []);
 
   const handleOpenModal = (ev?: any) => {
@@ -38,7 +37,6 @@ const Agenda = () => {
   const handleDelete = async (id: string) => {
     if (confirm('¿Eliminar este evento de la agenda?')) {
       await eventsDAO.delete(id);
-      loadData();
     }
   };
 
@@ -50,7 +48,6 @@ const Agenda = () => {
       await eventsDAO.create(formData, user);
     }
     setIsModalOpen(false);
-    loadData();
   };
 
   return (

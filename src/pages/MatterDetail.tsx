@@ -29,32 +29,60 @@ const MatterDetail = () => {
 
   useEffect(() => {
     if (!id) return;
-    const loadAll = async () => {
-      const m: any = await mattersDAO.getById(id);
+
+    // 1. Subscribe to the specific Matter
+    const unsubscribeMatter = mattersDAO.subscribeToId(id, (m: any) => {
       if (m) {
-        const [c, act, notes, d, e, i, p] = await Promise.all([
-          clientsDAO.getById(m.clientId),
-          actionsDAO.getAll(user),
-          internalNotesDAO.getAll(user),
-          documentsDAO.getAll(user),
-          eventsDAO.getAll(user),
-          invoicesDAO.getAll(user),
-          paymentsDAO.getAll(user)
-        ]);
         setMatter(m);
-        setClient(c);
-        setActions(act.filter((a: any) => a.matterId === id));
-        setInternalNotes(notes.filter((n: any) => n.matterId === id));
-        setDocs(d.filter((doc: any) => doc.referenceId === id));
-        setEvents(e.filter((ev: any) => ev.matterId === id));
-        setInvoices(i.filter((inv: any) => inv.matterId === id));
-        
-        const matterInvoiceIds = i.filter((inv: any) => inv.matterId === id).map(inv => inv.id);
-        setPayments(p.filter((pay: any) => matterInvoiceIds.includes(pay.invoiceId)));
+        // Load client once the matter is known
+        clientsDAO.getById(m.clientId).then(setClient);
       }
+    });
+
+    // 2. Subscribe to Actions related to this matter
+    const unsubscribeActions = actionsDAO.subscribe((all: any[]) => {
+      setActions(all.filter((a: any) => a.matterId === id));
+    });
+
+    // 3. Subscribe to Internal Notes
+    const unsubscribeNotes = internalNotesDAO.subscribe((all: any[]) => {
+      setInternalNotes(all.filter((n: any) => n.matterId === id));
+    });
+
+    // 4. Subscribe to Documents
+    const unsubscribeDocs = documentsDAO.subscribe((all: any[]) => {
+      setDocs(all.filter((doc: any) => doc.referenceId === id));
+    });
+
+    // 5. Subscribe to Events (Agenda)
+    const unsubscribeEvents = eventsDAO.subscribe((all: any[]) => {
+      setEvents(all.filter((ev: any) => ev.matterId === id));
+    });
+
+    // 6. Subscribe to Invoices and calculate payments
+    const unsubscribeInvoices = invoicesDAO.subscribe((allInvoices: any[]) => {
+      const matterInvoices = allInvoices.filter((inv: any) => inv.matterId === id);
+      setInvoices(matterInvoices);
+      
+      const matterInvoiceIds = matterInvoices.map(inv => inv.id);
+      
+      // Subscribe to payments only when we have invoice IDs
+      const unsubscribePayments = paymentsDAO.subscribe((allPayments: any[]) => {
+        setPayments(allPayments.filter((p: any) => matterInvoiceIds.includes(p.invoiceId)));
+      });
+      
       setLoading(false);
+      return () => unsubscribePayments();
+    });
+
+    return () => {
+      unsubscribeMatter();
+      unsubscribeActions();
+      unsubscribeNotes();
+      unsubscribeDocs();
+      unsubscribeEvents();
+      unsubscribeInvoices();
     };
-    loadAll();
   }, [id, user]);
 
   if (loading) return <div style={{ padding: '2rem', textAlign: 'center' }}>Abriendo expediente...</div>;
